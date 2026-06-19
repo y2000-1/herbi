@@ -1,0 +1,55 @@
+# ==============================================================
+# HerbiEstim API — Docker Compose
+# ==============================================================
+# Usage:
+#   CPU mode:    docker compose up -d
+#   GPU mode:    docker compose --profile gpu up -d
+#   With SAM:    HERBI_ENABLE_SAM=true docker compose --profile gpu up -d
+# ==============================================================
+
+services:
+  herbiestim-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: herbiestim-api
+    restart: unless-stopped
+    ports:
+      - "${API_PORT:-8000}:8000"
+    environment:
+      - HERBI_MODEL_NAME=${HERBI_MODEL_NAME:-universal}
+      - HERBI_CHECKPOINTS_DIR=/app/model_saved
+      - HERBI_GPU_IDS=${HERBI_GPU_IDS:-}
+      - HERBI_ENABLE_SAM=${HERBI_ENABLE_SAM:-false}
+      - HERBI_SAM_DEVICE=${HERBI_SAM_DEVICE:-cuda}
+      - HERBI_API_KEY=${HERBI_API_KEY:-}
+      - HERBI_CORS_ORIGINS=${HERBI_CORS_ORIGINS:-*}
+      - HERBI_RATE_LIMIT_PER_MINUTE=${HERBI_RATE_LIMIT_PER_MINUTE:-30}
+      - HERBI_MAX_UPLOAD_SIZE_MB=${HERBI_MAX_UPLOAD_SIZE_MB:-20}
+      - HERBI_DEFAULT_DPI=${HERBI_DEFAULT_DPI:-300}
+    volumes:
+      # Mount SAM models externally to avoid bloating the image
+      - ${SAM_MODEL_DIR:-./model_saved}:/app/model_saved:ro
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # GPU variant — activate with: docker compose --profile gpu up -d
+  herbiestim-api-gpu:
+    extends:
+      service: herbiestim-api
+    container_name: herbiestim-api-gpu
+    profiles:
+      - gpu
+    environment:
+      - HERBI_GPU_IDS=0
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
