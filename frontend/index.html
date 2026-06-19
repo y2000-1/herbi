@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <!-- Mobile viewport: standard, no zoom, safe-area for notch screens -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="format-detection" content="telephone=no">
+    <meta name="theme-color" content="#2d8c4a" media="(prefers-color-scheme: light)">
+    <meta name="theme-color" content="#1a5c30" media="(prefers-color-scheme: dark)">
+
+    <title>HerbiEstim — 叶片虫食损伤评估</title>
+
+    <!-- Preload critical assets -->
+    <link rel="preload" href="/static/css/style.css" as="style">
+    <link rel="stylesheet" href="/static/css/style.css">
+
+    <!-- Favicon (inline SVG) -->
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='28' font-size='28'>🌿</text></svg>">
+</head>
+<body>
+    <!-- ===== Theme toggle ===== -->
+    <button id="themeToggle" class="theme-toggle" aria-label="切换深浅色主题" title="切换深浅色主题">
+        <span class="theme-icon-light">☀️</span>
+        <span class="theme-icon-dark">🌙</span>
+    </button>
+
+    <!-- ===== Main container ===== -->
+    <main class="app-container">
+        <!-- Header -->
+        <header class="app-header">
+            <h1 class="app-title">🌿 HerbiEstim</h1>
+            <p class="app-subtitle">叶片虫食损伤智能评估系统</p>
+            <p class="app-desc">上传叶片照片，自动识别虫食损伤面积与等级</p>
+        </header>
+
+        <!-- Upload Section -->
+        <section id="uploadSection" class="card upload-section">
+            <div class="upload-area" id="uploadArea">
+                <input
+                    type="file"
+                    id="fileInput"
+                    class="file-input"
+                    accept="image/*"
+                    capture="environment"
+                    aria-label="选择或拍摄叶片照片"
+                >
+                <div class="upload-content">
+                    <div class="upload-icon">📷</div>
+                    <p class="upload-text">点击拍照或选择图片</p>
+                    <p class="upload-hint">支持 JPG / PNG / HEIC / TIFF / BMP / WebP</p>
+                </div>
+            </div>
+
+            <!-- Options -->
+            <div class="options-row">
+                <div class="option-item">
+                    <label class="option-label" for="dpiInput">扫描 DPI</label>
+                    <input type="number" id="dpiInput" class="option-input" value="300" min="72" max="2400" step="1">
+                </div>
+                <div class="option-item">
+                    <label class="switch-label">
+                        <input type="checkbox" id="scannedToggle" class="switch-input">
+                        <span class="switch-track">
+                            <span class="switch-thumb"></span>
+                        </span>
+                        <span class="switch-text">扫描图</span>
+                    </label>
+                </div>
+                <div class="option-item">
+                    <label class="switch-label">
+                        <input type="checkbox" id="samToggle" class="switch-input">
+                        <span class="switch-track">
+                            <span class="switch-thumb"></span>
+                        </span>
+                        <span class="switch-text">SAM模式</span>
+                    </label>
+                </div>
+            </div>
+
+            <button id="analyzeBtn" class="btn btn-primary btn-full" disabled>
+                <span class="btn-text">开始分析</span>
+                <span class="btn-spinner hidden"></span>
+            </button>
+
+            <!-- Preview thumbnail -->
+            <div id="previewContainer" class="preview-container hidden">
+                <img id="previewImage" class="preview-image" alt="预览图片">
+                <button id="clearPreview" class="preview-clear" aria-label="清除图片">✕</button>
+            </div>
+        </section>
+
+        <!-- Status / Progress -->
+        <section id="statusSection" class="status-section hidden">
+            <div class="status-card card">
+                <div class="progress-bar-container">
+                    <div id="progressBar" class="progress-bar"></div>
+                </div>
+                <p id="statusText" class="status-text">正在处理...</p>
+                <div id="loadingSpinner" class="loading-spinner"></div>
+            </div>
+        </section>
+
+        <!-- Error -->
+        <section id="errorSection" class="error-section hidden">
+            <div class="card card-error">
+                <div class="error-icon">⚠️</div>
+                <h3 class="error-title">处理出错</h3>
+                <p id="errorMessage" class="error-message"></p>
+                <button id="dismissError" class="btn btn-secondary">关闭</button>
+            </div>
+        </section>
+
+        <!-- Results Summary -->
+        <section id="summarySection" class="summary-section hidden">
+            <div class="card summary-card">
+                <h2 class="section-title">📊 全局分析结果</h2>
+                <div class="summary-grid">
+                    <div class="summary-item">
+                        <span class="summary-value" id="summaryLeaves">0</span>
+                        <span class="summary-label">检测叶片数</span>
+                    </div>
+                    <div class="summary-item">
+                        <span class="summary-value" id="summaryDamage">0%</span>
+                        <span class="summary-label">平均损伤率</span>
+                    </div>
+                    <div class="summary-item">
+                        <span class="summary-value" id="summaryLeafArea">--</span>
+                        <span class="summary-label">叶片总面积</span>
+                    </div>
+                    <div class="summary-item">
+                        <span class="summary-value" id="summaryIntactArea">--</span>
+                        <span class="summary-label">完整预估面积</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Per-Leaf Results -->
+        <section id="leavesSection" class="leaves-section hidden">
+            <h2 class="section-title">🔬 叶片健康复原对比</h2>
+            <div id="leavesContainer" class="leaves-container">
+                <!-- Dynamically filled -->
+            </div>
+        </section>
+
+        <!-- Footer -->
+        <footer class="app-footer">
+            <p>HerbiEstim — 基于 pix2pix GAN 的叶片虫食损伤评估</p>
+            <p class="footer-version">v2.0.0 · 跨平台兼容 · 桌面端 & 移动端</p>
+        </footer>
+    </main>
+
+    <!-- ===== Toast container ===== -->
+    <div id="toastContainer" class="toast-container"></div>
+
+    <!-- ===== Scripts ===== -->
+    <script src="/static/js/exif.js"></script>
+    <script src="/static/js/api.js"></script>
+    <script src="/static/js/app.js"></script>
+</body>
+</html>
